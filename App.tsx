@@ -1,15 +1,19 @@
-// App.tsx
-import React from 'react';
-import { StatusBar } from 'react-native';
+import React, { useState } from 'react';
+import { SafeAreaView, StatusBar } from 'react-native';
 import LoginScreen from './src/screens/LoginScreen';
+import MainScreen  from './src/screens/MainScreen';
 
 export default function App() {
+  const [logged, setLogged]   = useState(false);
+  const [dark, setDark]       = useState(false);   // tema claro/oscuro
+
   return (
-    <>
-      {/* Ajusta el estilo de la barra de estado si quieres claro/oscuro */}
-      <StatusBar barStyle="dark-content" />
-      {/* Aquí invocas tu login */}
-      <LoginScreen />
-    </>
+    <SafeAreaView style={{ flex: 1, backgroundColor: dark ? '#101113' : '#FFFFFF' }}>
+      <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+      {logged
+        ? <MainScreen dark={dark} toggleTheme={() => setDark(!dark)} />
+        : <LoginScreen dark={dark} toggleTheme={() => setDark(!dark)} onSuccess={() => setLogged(true)} />
+      }
+    </SafeAreaView>
   );
 }
