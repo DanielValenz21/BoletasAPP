@@ -1,29 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  KeyboardAvoidingView, Platform, StyleSheet,
+  View, Text, TextInput, TouchableOpacity,
+  ScrollView, KeyboardAvoidingView, Platform,
+  StyleSheet, ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useDispatch, useSelector } from 'react-redux';
+import { login } from '../store/authSlice';
+import { RootState } from '../store';
 
 const GREEN = '#1E7F40';
 const GRAY  = '#888';
 
-export default function LoginScreen({ dark, toggleTheme, onSuccess }) {
+export default function LoginScreen({ dark, toggleTheme }) {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
+
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector(s => s.auth);
+
+  const submit = () => {
+    if (!user || !pass || loading) return;
+    dispatch(login({ username: user, password: pass }));
+  };
 
   return (
     <KeyboardAvoidingView
       style={[styles.flex, dark && { backgroundColor:'#101113' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {/* Toggle tema */}
         <TouchableOpacity style={styles.toggle} onPress={toggleTheme}>
           <Icon name={dark ? 'sun' : 'moon'} size={20} color={dark ? '#FFD740' : '#666'} />
         </TouchableOpacity>
 
-        {/* Avatar */}
+        {/* Avatar TM */}
         <View style={styles.shadow}>
           <View style={[styles.avatar, { backgroundColor:GREEN }]}>
             <Text style={styles.avatarTxt}>TM</Text>
@@ -35,8 +47,9 @@ export default function LoginScreen({ dark, toggleTheme, onSuccess }) {
           Sistema de Control de Infracciones
         </Text>
 
-        {/* Formulario */}
+        {/* Form */}
         <View style={[styles.card, dark && { backgroundColor:'#1C1D1F' }]}>
+          {/* Usuario */}
           <Text style={[styles.label, dark && { color:'#FFF' }]}>Usuario</Text>
           <View style={[styles.inputWrap, dark && { borderColor:'#444' }]}>
             <Icon name="mail" size={18} color={GRAY} style={{ marginRight:8 }}/>
@@ -44,11 +57,14 @@ export default function LoginScreen({ dark, toggleTheme, onSuccess }) {
               style={[styles.input, dark && { color:'#FFF' }]}
               placeholder="Ingrese su usuario"
               placeholderTextColor={GRAY}
+              autoCapitalize="none"
               value={user}
               onChangeText={setUser}
+              returnKeyType="next"
             />
           </View>
 
+          {/* Contraseña */}
           <Text style={[styles.label, dark && { color:'#FFF' }]}>Contraseña</Text>
           <View style={[styles.inputWrap, dark && { borderColor:'#444' }]}>
             <Icon name="lock" size={18} color={GRAY} style={{ marginRight:8 }}/>
@@ -59,26 +75,35 @@ export default function LoginScreen({ dark, toggleTheme, onSuccess }) {
               secureTextEntry
               value={pass}
               onChangeText={setPass}
+              returnKeyType="done"
+              onSubmitEditing={submit}
             />
           </View>
 
-          <TouchableOpacity style={styles.btn} onPress={() => onSuccess?.()}>
-            <Text style={styles.btnTxt}>Iniciar Sesión</Text>
-            <Icon name="chevron-right" size={16} color="#FFF" />
-          </TouchableOpacity>
-        </View>
+          {/* Error */}
+          {error && <Text style={styles.error}>{error}</Text>}
 
-        {/* Logos al fondo */}
-        <View style={styles.logos}>
-          <View style={styles.logo}/>
-          <View style={styles.divider}/>
-          <View style={styles.logo}/>
+          {/* Botón */}
+          <TouchableOpacity
+            style={[styles.btn, loading && { opacity:0.7 }]}
+            onPress={submit}
+            disabled={loading}
+          >
+            {loading
+              ? <ActivityIndicator color="#FFF"/>
+              : <>
+                  <Text style={styles.btnTxt}>Iniciar Sesión</Text>
+                  <Icon name="chevron-right" size={16} color="#FFF" />
+                </>
+            }
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
+/* estilos… (idénticos a los que tenías) */
 const styles = StyleSheet.create({
   flex:{ flex:1, backgroundColor:'#FFF' },
   container:{ alignItems:'center', padding:24 },
@@ -97,11 +122,8 @@ const styles = StyleSheet.create({
   inputWrap:{ flexDirection:'row', alignItems:'center', borderWidth:1,
               borderColor:'#DDD', borderRadius:10, paddingHorizontal:12, marginBottom:20 },
   input:{ flex:1, height:44, fontSize:14, color:'#000' },
+  error:{ color:'#DC2626', textAlign:'center', marginBottom:8 },
   btn:{ flexDirection:'row', justifyContent:'center', alignItems:'center',
         backgroundColor:GREEN, borderRadius:10, paddingVertical:14 },
   btnTxt:{ color:'#FFF', fontSize:16, fontWeight:'600', marginRight:4 },
-
-  logos:{ flexDirection:'row', alignItems:'center', marginTop:40 },
-  logo:{ width:48, height:48, backgroundColor:'#E5E7EB', borderRadius:8 },
-  divider:{ width:1, height:32, backgroundColor:'#D1D5DB', marginHorizontal:24 },
 });
