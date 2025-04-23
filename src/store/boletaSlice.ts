@@ -1,13 +1,38 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import client from '../api/client';
 
+/** 🔸 interfaz COMPLETA – refleja 1 : 1 la respuesta del backend */
 export interface Boleta {
   id: number;
+  /** vehículo */
   numeroPlaca: string;
+  tarjetaCirculacion: string;
+  tipoVehiculo: string;
+  marca: string;
+  color: string;
+
+  /** infractor */
   nombres: string;
   apellidos: string;
+  licencia: string;
+  tipoLicencia: string;
+  genero: string;
+  nit: string | null;
+
+  /** infracción */
+  articuloInfringido: string;
   monto: number;
-  fechaInfraccion: string;          // ← por si luego la quieras mostrar
+  baseLegal: string;
+  lugarInfraccion: string;
+  fechaInfraccion: string;   // ISO
+  horaInfraccion: string;
+  observaciones: string | null;
+
+  /** agente / metadatos */
+  numeroAgente: string;
+  createdAt: string;
+  updatedAt: string | null;
+  createdBy: number;
 }
 
 interface State {

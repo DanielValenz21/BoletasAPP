@@ -5,22 +5,26 @@ import {
   FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER,
 } from 'redux-persist';
 
-import auth          from './authSlice';
+import auth from './authSlice';
+import boletas from './boletaSlice';          // 👈 nuevo
 import { setupInterceptors } from '../api/setupInterceptors';
 
-/* --- reducers ---------------------------------------------------------------- */
-const rootReducer = combineReducers({ auth });
+/* ---------------- reducers ------------------ */
+const rootReducer = combineReducers({
+  auth,
+  boletas,                                    // 👈 lo añadimos
+});
 
-/* --- persist: EXCLUIMOS el slice 'auth' -------------------------------------- */
+/* ---- persist  (NO guardamos auth) ---------- */
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  blacklist: ['auth'],          // <- nada de token en disco
+  blacklist: ['auth'],
 };
 
 const persisted = persistReducer(persistConfig, rootReducer);
 
-/* --- store ------------------------------------------------------------------- */
+/* ---------------- store --------------------- */
 export const store = configureStore({
   reducer: persisted,
   middleware: getDefault => getDefault({
@@ -30,12 +34,12 @@ export const store = configureStore({
   }),
 });
 
-/* --- axios + token ----------------------------------------------------------- */
+/* -------- axios + token interceptor --------- */
 setupInterceptors(store);
 
-/* --- tipos ------------------------------------------------------------------- */
+/* --------------- tipos ---------------------- */
 export type RootState   = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 
-/* --- persistor (por si persistes OTROS slices) ------------------------------- */
+/* --------- persistor (otros slices) --------- */
 export const persistor = persistStore(store);
