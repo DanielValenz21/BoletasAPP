@@ -1,33 +1,41 @@
-import { configureStore } from '@reduxjs/toolkit';
-import { combineReducers } from 'redux';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  persistStore,
-  persistReducer,
+  persistStore, persistReducer,
   FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER,
 } from 'redux-persist';
 
-import auth from './authSlice';
+import auth          from './authSlice';
+import { setupInterceptors } from '../api/setupInterceptors';
 
+/* --- reducers ---------------------------------------------------------------- */
 const rootReducer = combineReducers({ auth });
 
+/* --- persist: EXCLUIMOS el slice 'auth' -------------------------------------- */
 const persistConfig = {
   key: 'root',
   storage: AsyncStorage,
-  whitelist: ['auth'],           // solo persistimos auth
+  blacklist: ['auth'],          // <- nada de token en disco
 };
 
-const store = configureStore({
-  reducer: persistReducer(persistConfig, rootReducer),
+const persisted = persistReducer(persistConfig, rootReducer);
+
+/* --- store ------------------------------------------------------------------- */
+export const store = configureStore({
+  reducer: persisted,
   middleware: getDefault => getDefault({
-    serializableCheck: {         // ignorar acciones redux‑persist
+    serializableCheck: {
       ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
     },
   }),
 });
 
+/* --- axios + token ----------------------------------------------------------- */
+setupInterceptors(store);
+
+/* --- tipos ------------------------------------------------------------------- */
 export type RootState   = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 
+/* --- persistor (por si persistes OTROS slices) ------------------------------- */
 export const persistor = persistStore(store);
-export default store;
