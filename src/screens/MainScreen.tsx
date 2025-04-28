@@ -1,4 +1,7 @@
-// src/screens/MainScreen.tsx
+/* ==========================================================
+ * src/screens/MainScreen.tsx
+ * Pantalla principal con OCR + envío de boletas
+ * ========================================================== */
 import React, {useEffect, useState, useCallback} from 'react';
 import {
   View,
@@ -9,17 +12,21 @@ import {
   FlatList,
   RefreshControl,
   Switch,
+  Alert,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather';
+import TextRecognition from 'react-native-text-recognition';
+import Icon            from 'react-native-vector-icons/Feather';
 import {useDispatch, useSelector} from 'react-redux';
 
-import Header       from '../components/Header';
-import BoletaItem   from '../components/BoletaItem';
-import BoletaModal  from '../components/BoletaModal';
+import Header      from '../components/Header';
+import BoletaItem  from '../components/BoletaItem';
+import BoletaModal from '../components/BoletaModal';
 
-import {fetchBoletas} from '../store/boletaSlice';
+import {fetchBoletas, submitBoleta} from '../store/boletaSlice';
 import type {RootState, AppDispatch} from '../store';
-import type {Boleta}  from '../store/boletaSlice';
+import type {Boleta} from '../store/boletaSlice';
+
+import {openCamera} from '../utils/openCamera';   // << util para abrir cámara
 
 const GREEN = '#1E7F40';
 type Tab = 'scan' | 'history' | 'settings';
@@ -39,8 +46,9 @@ export default function MainScreen({dark, toggleTheme}: Props) {
   useEffect(() => { load(); }, [load]);
 
   /* ---------------- UI state ---------------- */
-  const [tab, setTab] = useState<Tab>('history');
-  const [sel, setSel] = useState<Boleta | null>(null);
+  const [tab, setTab]         = useState<Tab>('history');
+  const [sel, setSel]         = useState<Boleta | null>(null);
+  const [ocr, setOcr]         = useState<Partial<Omit<Boleta, 'id'>> | null>(null);
 
   /* ---------------- Colores según tema ---------------- */
   const bg     = dark ? '#101113' : '#FFF';
@@ -48,12 +56,63 @@ export default function MainScreen({dark, toggleTheme}: Props) {
   const muted  = dark ? '#AAA'    : '#666';
   const border = dark ? '#333'    : '#EEE';
 
+  /* ---------- 1. ESCANEAR DOCUMENTO ---------- */
+  const handleScan = async () => {
+    const uri = await openCamera();
+    if (!uri) return;
+
+    const lines = await TextRecognition.recognize(uri);
+
+    // Ajusta expresiones regulares a tu boleta real
+    const placa    = lines.find(l => /placa[:\s\-]/i.test(l));
+    const nombre   = lines.find(l => /nombres?[:\s\-]/i.test(l));
+    const apellido = lines.find(l => /apellidos?[:\s\-]/i.test(l));
+    const articulo = lines.find(l => /art\./i.test(l));
+    const monto    = lines.find(l => /\$\s*\d+/i.test(l));
+
+    setOcr({
+      numeroPlaca: placa?.split(/[:\s]/).pop() || '',
+      nombres: nombre   ? nombre.split(/[:\s]/).slice(1).join(' ')   : '',
+      apellidos: apellido ? apellido.split(/[:\s]/).slice(1).join(' '): '',
+      articuloInfringido: articulo || '',
+      monto: monto ? parseFloat(monto.replace(/[^\d.]/g, '')) : 0,
+      tarjetaCirculacion: '',
+      nit: '',
+      tipoVehiculo: '',
+      marca: '',
+      color: '',
+      licencia: '',
+      tipoLicencia: '',
+      genero: '',
+      baseLegal: '',
+      lugarInfraccion: '',
+      fechaInfraccion: new Date().toISOString().split('T')[0],
+      horaInfraccion: new Date().toTimeString().slice(0,5),
+      observaciones: '',
+      numeroAgente: '',
+    });
+    setTab('scan');          // por si venías de otro tab
+  };
+
+  /* ---------- 2. ENVIAR AL BACKEND ---------- */
+  const handleSend = async () => {
+    if (!ocr) return;
+    try {
+      const {message} = await dispatch(submitBoleta(ocr as any)).unwrap();
+      Alert.alert('Éxito', message);
+      setOcr(null);
+      load();
+    } catch (err: any) {
+      Alert.alert('Error', err.message || String(err));
+    }
+  };
+
   /* ---------------- Render ---------------- */
   return (
     <View style={[styles.flex, {backgroundColor: bg}]}>
       <Header dark={dark} toggleTheme={toggleTheme} />
 
-      {/* ------------ Cuerpo ------------ */}
+      {/* ------------ HISTORIAL ------------ */}
       {tab === 'history' && (
         <FlatList
           data={list}
@@ -84,41 +143,43 @@ export default function MainScreen({dark, toggleTheme}: Props) {
         />
       )}
 
+      {/* ------------ ESCANEAR ------------- */}
       {tab === 'scan' && (
         <ScrollView contentContainerStyle={styles.body}>
           <Text style={styles.h1}>Escaneo de Boletas de Multa</Text>
 
-          <TouchableOpacity style={[styles.scanBtn, {backgroundColor: GREEN}]}>
+          <TouchableOpacity style={[styles.scanBtn, {backgroundColor: GREEN}]}
+                            onPress={handleScan}>
             <Icon name="camera" size={20} color="#FFF" style={{marginRight: 8}} />
             <Text style={styles.scanTxt}>Escanear Documento</Text>
           </TouchableOpacity>
 
-          <View style={[styles.card, {backgroundColor: card}]}>
-            <Text style={styles.cardTitle}>Datos Extraídos</Text>
+          {ocr && (
+            <View style={[styles.card, {backgroundColor: card}]}>
+              <Text style={styles.cardTitle}>Datos Extraídos</Text>
 
-            <DataRow icon="truck"      label="Número de Placa"      value="ABC-123"                    muted={muted} />
-            <DataRow icon="user"       label="Nombre del Infractor" value="Juan Pérez"                 muted={muted} />
-            <DataRow icon="file-text"  label="Artículo Infringido"  value="Art. 145 – Exceso de velocidad" muted={muted} />
-            <DataRow icon="dollar-sign"label="Monto"                value="$150.00"                    muted={muted} />
+              <DataRow icon="truck"       label="Número de Placa" value={ocr.numeroPlaca!} muted={muted}/>
+              <DataRow icon="user"        label="Nombre"          value={`${ocr.nombres} ${ocr.apellidos}`} muted={muted}/>
+              <DataRow icon="file-text"   label="Artículo"        value={ocr.articuloInfringido!} muted={muted}/>
+              <DataRow icon="dollar-sign" label="Monto"           value={`$${ocr.monto?.toFixed(2)}`} muted={muted}/>
 
-            <TouchableOpacity style={[styles.sendBtn, {backgroundColor: GREEN}]}>
-              <Icon name="send" size={18} color="#FFF" style={{marginRight: 6}} />
-              <Text style={styles.sendTxt}>Enviar Multa</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity style={[styles.sendBtn, {backgroundColor: GREEN}]}
+                                onPress={handleSend}>
+                <Icon name="send" size={18} color="#FFF" style={{marginRight: 6}} />
+                <Text style={styles.sendTxt}>Enviar Multa</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       )}
 
+      {/* ------------ AJUSTES ------------- */}
       {tab === 'settings' && (
         <ScrollView contentContainerStyle={styles.body}>
           <Text style={styles.h1}>Configuración</Text>
 
           <View style={[styles.settingsCard, {backgroundColor: card, borderColor: border}]}>
-            <SettingRow icon="user"     label="Perfil de Usuario" />
-            <Divider border={border} />
-            <SettingRow icon="settings" label="Preferencias" />
-            <Divider border={border} />
-            <SettingRow icon="moon"     label="Tema">
+            <SettingRow icon="moon" label="Tema">
               <Switch
                 value={dark}
                 onValueChange={toggleTheme}
@@ -140,7 +201,7 @@ export default function MainScreen({dark, toggleTheme}: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* ------------ Modal ------------ */}
+      {/* ------------ Modal Detalle ------------ */}
       {sel && (
         <BoletaModal
           visible
@@ -152,10 +213,9 @@ export default function MainScreen({dark, toggleTheme}: Props) {
   );
 }
 
-/* ---------- Sub-componentes ---------- */
-function DataRow({
-  icon, label, value, muted,
-}: {icon: string; label: string; value: string; muted: string}) {
+/* ---------- Sub-components ---------- */
+function DataRow({icon, label, value, muted}:
+  {icon: string; label: string; value: string; muted: string}) {
   return (
     <View style={styles.dataRow}>
       <Icon name={icon} size={18} color={GREEN} style={{marginRight: 12}} />
@@ -166,10 +226,8 @@ function DataRow({
     </View>
   );
 }
-
-function SettingRow({
-  icon, label, children,
-}: {icon: string; label: string; children?: React.ReactNode}) {
+function SettingRow({icon, label, children}:
+  {icon: string; label: string; children?: React.ReactNode}) {
   return (
     <View style={styles.settingRow}>
       <Icon name={icon} size={18} color={GREEN} style={{marginRight: 12}} />
@@ -178,14 +236,8 @@ function SettingRow({
     </View>
   );
 }
-
-function Divider({border}: {border: string}) {
-  return <View style={{height: 1, backgroundColor: border, marginHorizontal: -20}} />;
-}
-
-function Nav({
-  icon, label, active, onPress, dark,
-}: {icon: string; label: string; active: boolean; onPress: () => void; dark: boolean}) {
+function Nav({icon, label, active, onPress, dark}:
+  {icon: string; label: string; active: boolean; onPress: () => void; dark: boolean}) {
   return (
     <TouchableOpacity style={styles.navBtn} onPress={onPress}>
       <Icon name={icon} size={22} color={active ? GREEN : dark ? '#888' : '#666'} />

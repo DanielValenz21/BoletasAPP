@@ -6,13 +6,13 @@ import {
 } from 'redux-persist';
 
 import auth from './authSlice';
-import boletas from './boletaSlice';          // 👈 nuevo
+import boletasReducer from './boletaSlice';
 import { setupInterceptors } from '../api/setupInterceptors';
 
 /* ---------------- reducers ------------------ */
 const rootReducer = combineReducers({
   auth,
-  boletas,                                    // 👈 lo añadimos
+  boletas: boletasReducer,
 });
 
 /* ---- persist  (NO guardamos auth) ---------- */

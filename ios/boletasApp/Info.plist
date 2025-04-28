@@ -31,6 +31,12 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Necesitamos la cámara para escanear la boleta</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Necesitamos acceder a las fotos para procesarlas</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Guardaremos la imagen después de tomarla</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>UILaunchStoryboardName</key>
